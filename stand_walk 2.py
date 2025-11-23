@@ -3,10 +3,6 @@ Dreamer-style minimal pipeline for Humanoid:
 1) collect random/weak-policy data into replay
 2) train deterministic latent model with multi-step loss
 3) run CEM planner in latent space with MPC loop
-Notes:
-- You MUST check/adjust score_obs_batch() to match your env obs layout.
-- Requires: torch, gym, numpy, tqdm
-- Recommended: run with a GPU for planner/model speed.
 """
 
 import os
