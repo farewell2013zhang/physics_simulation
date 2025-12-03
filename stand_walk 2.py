@@ -126,20 +126,6 @@ class EpisodeReplay:
             act_batch[i] = ep['act'][start:start+chunk_len]
         return obs_batch, act_batch
 
-    def random_batch(self, batch_size):
-        # sample random transitions
-        obs = np.zeros((batch_size, self.obs_dim), dtype=np.float32)
-        act = np.zeros((batch_size, self.act_dim), dtype=np.float32)
-        next_obs = np.zeros((batch_size, self.obs_dim), dtype=np.float32)
-        for i in range(batch_size):
-            ep = random.choice(self.episodes)
-            L = ep['obs'].shape[0]
-            idx = np.random.randint(0, L-1)
-            obs[i] = ep['obs'][idx]
-            act[i] = ep['act'][idx]
-            next_obs[i] = ep['obs'][idx+1]
-        return obs, act, next_obs
-
 # ---------------------------
 # Latent model: Encoder / Dynamics / Decoder (deterministic residual)
 # ---------------------------
@@ -228,7 +214,6 @@ def cem_planner_latent(env, obs_rms, model, model_ppo, obs, horizon, action_low,
         z0 = z0.unsqueeze(0)
     # obs_pre = env.unnormalize_obs(obs)
     obs_pre = obs.copy()
-    latent_dim = z0.shape[-1]
     action_dim = action_low.shape[0]
     mu = np.zeros((horizon, action_dim), dtype=np.float32)
     std = np.ones_like(mu) * ((action_high - action_low) / 2.0)[None, :]
@@ -433,6 +418,7 @@ def run_mpc(env, model, obs_rms, replay, model_ppo=None, device='cuda', plan_hor
     ep_next = [None] * env.num_envs
     ep_done = [None] * env.num_envs
     ep_len = []
+    ep_xlast = []
     planned_seq = [None] * env.num_envs
     scores = [None] * env.num_envs
     step_in_plan = np.zeros(env.num_envs, dtype=np.int32)
@@ -471,6 +457,7 @@ def run_mpc(env, model, obs_rms, replay, model_ppo=None, device='cuda', plan_hor
                 replay.add_episode(ep_obs[ienv]+ep_next[ienv][-1:], ep_act[ienv], ep_done[ienv])
                 ep_obs[ienv], ep_act[ienv], ep_next[ienv], ep_done[ienv] = [], [], [], []
                 ep_len.append(step_in_env[ienv])
+                ep_xlast.append(info[ienv]["terminal_observation"][0])
                 planned_seq[ienv] = None
                 scores[ienv] = None
                 step_in_plan[ienv] = 0
@@ -482,7 +469,8 @@ def run_mpc(env, model, obs_rms, replay, model_ppo=None, device='cuda', plan_hor
         if total_steps % eval_every == 0 and len(ep_len):
             # quick eval using heuristic score
             ep_len_mean = np.mean(np.array(ep_len[-20:])) if len(ep_len) >= 20 else np.mean(np.array(ep_len))
-            print(f"[Eval] total_steps={total_steps}, mean_score={ep_len_mean:.3f}")
+            ep_xlast_mean = np.mean(np.array(ep_xlast[-20:])) if len(ep_xlast) >= 20 else np.mean(np.array(ep_xlast))
+            print(f"[Eval] total_steps={total_steps}, mean_ep_len={ep_len_mean:.3f}, mean_ep_xlast={ep_xlast_mean:.3f}")
     print("MPC finished running.")
 
 # ---------------------------
