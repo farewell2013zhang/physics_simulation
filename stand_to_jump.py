@@ -180,5 +180,5 @@ def eval():
     venv.close()
 
 if __name__ == "__main__":
-    main()
-    # eval()
+    # main()
+    eval()
