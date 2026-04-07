@@ -486,8 +486,8 @@ def run_mpc(env, model, obs_rms, replay, model_ppo=None, device='cuda', plan_hor
 def main():
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     env = DummyVecEnv([lambda: create_env(exclude_current_positions_from_observation=True) for _ in range(1)])
-    env_norm = VecNormalize.load("./humanoid_log/Stand_Walk/MlpPolicy/PPO_2/vec_normalize.pkl", env)
-    model_ppo = PPO.load("./humanoid_log/Stand_Walk/MlpPolicy/PPO_2/best_model.zip", env=env_norm)
+    env_norm = VecNormalize.load("./humanoid_log/Stand_Walk/MlpPolicy/PPO_1/vec_normalize.pkl", env)
+    model_ppo = PPO.load("./humanoid_log/Stand_Walk/MlpPolicy/PPO_1/best_model.zip", env=env_norm)
     obs_rms = env_norm.obs_rms
     # inspect obs dim and action dim
     env = DummyVecEnv([lambda: create_env(healthy_z_range_low=0.9) for _ in range(7)])
