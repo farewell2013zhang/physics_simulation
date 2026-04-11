@@ -40,7 +40,7 @@ class EnvWrapper(gym.Wrapper):
     def step(self, action):
         self.index += 1
         obs, reward, done, terminated, info = self.env.step(action)
-        reward += 5 * (1 - (1.4 - min(obs[0], 1.4)) ** 2 / 1.4 ** 2)
+        reward += 5 * (1 - (2.5 - min(obs[0], 2.5)) ** 2 / 2.5 ** 2)
         # z_all = self.z_sum/self.z_cnt
         # if obs[0] > z_all and obs[0] < 1.4:
         #     reward += 100
