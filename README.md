@@ -1,1 +1,1 @@
-This repo is to document my result of reinforcement learning for humanoid action tasks in mujoco environment
+This project explores reinforcement learning for humanoid control in continuous physics environments using MuJoCo, with a focus on emergent behaviors such as stable standing, locomotion, and dynamic transitions (e.g., jump and recovery).
