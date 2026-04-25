@@ -515,6 +515,7 @@ def main():
 
 def eval():
     env = DummyVecEnv([lambda: make_env(render_mode="human") for _ in range(1)])
+    # env = DummyVecEnv([lambda: make_env(render_mode="rgb_array") for _ in range(1)])
     env = VecNormalize.load("./humanoid_log/Jump/Lay Down Position/MlpPolicy/SAC_1/vec_normalize.pkl", env)
     env.training = False
     env.norm_reward = False
@@ -532,7 +533,8 @@ def eval():
 
     t = 0
     z_hist = []
-    for i in range(1000000):
+    frames = []
+    for i in range(1000):
         action, _ = model.predict(obs)
         obs, reward, done, info = env.step(action)
         z_hist.append(env.unnormalize_obs(obs)[0,0])
@@ -542,11 +544,14 @@ def eval():
             a = sum(z_hist)/len(z_hist)
             print(f"average height: {a}")
         t += 1
-        env.render()
+        frame = env.render()
+        frames.append(frame)
         if done[0]:
             print(f"time lasts: {dt_per_step * t}")
             t = 0
             obs = env.reset()
+    # import imageio
+    # imageio.mimsave("./humanoid_log/Jump/Lay Down Position/MlpPolicy/SAC_1/final.gif", frames, fps=30)
     env.close()
 
 if __name__ == "__main__":
