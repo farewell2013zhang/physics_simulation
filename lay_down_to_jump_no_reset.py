@@ -410,6 +410,7 @@ class EarlyStopAndSaveBestCallback(BaseCallback):
         self.snapshot = []
         self.round = 0
         self.warmup = 0
+        self.i_stage = 0
 
     def _on_step(self):
         # Early stop condition
@@ -443,9 +444,16 @@ class EarlyStopAndSaveBestCallback(BaseCallback):
         # Check improvement
         if current_value > self.best_value + self.min_delta:
             self.best_value = current_value
-            self.counter = 0
             if self.best_value_all < self.best_value:
                 self.best_value_all = self.best_value
+                # Save the best model at current stage
+                if self.counter > 100:
+                    best_model_path = os.path.join(self.save_path, f"best_model_stage{self.i_stage}.zip")
+                    self.model.save(best_model_path)
+                    if hasattr(self.model.get_env(), "save"):
+                        self.model.get_env().save(os.path.join(self.save_path, f"vec_normalize_stage{self.i_stage}.pkl"))
+                    np.save(os.path.join(self.save_path, f"obs_init_stage{self.i_stage}.npy"), self.model.env.venv.unwrapped.envs[0].obs_init)
+                    self.i_stage += 1
                 # Save the best model
                 best_model_path = os.path.join(self.save_path, "best_model.zip")
                 self.model.save(best_model_path)
@@ -454,6 +462,7 @@ class EarlyStopAndSaveBestCallback(BaseCallback):
                 np.save(os.path.join(self.save_path, "obs_init.npy"), self.model.env.venv.unwrapped.envs[0].obs_init)
                 if self.verbose > 0:
                     print(f"✅ Saved new best model, value={current_value:.4f}")
+            self.counter = 0
         else:
             self.counter += 1
             if self.counter >= self.patience:
@@ -515,7 +524,6 @@ def main():
 
 def eval():
     env = DummyVecEnv([lambda: make_env(render_mode="human") for _ in range(1)])
-    # env = DummyVecEnv([lambda: make_env(render_mode="rgb_array") for _ in range(1)])
     env = VecNormalize.load("./humanoid_log/Jump/Lay Down Position/MlpPolicy/SAC_1/vec_normalize.pkl", env)
     env.training = False
     env.norm_reward = False
@@ -533,8 +541,7 @@ def eval():
 
     t = 0
     z_hist = []
-    frames = []
-    for i in range(1000):
+    for i in range(1000000):
         action, _ = model.predict(obs)
         obs, reward, done, info = env.step(action)
         z_hist.append(env.unnormalize_obs(obs)[0,0])
@@ -544,16 +551,59 @@ def eval():
             a = sum(z_hist)/len(z_hist)
             print(f"average height: {a}")
         t += 1
-        frame = env.render()
-        frames.append(frame)
+        env.render()
         if done[0]:
             print(f"time lasts: {dt_per_step * t}")
             t = 0
             obs = env.reset()
-    # import imageio
-    # imageio.mimsave("./humanoid_log/Jump/Lay Down Position/MlpPolicy/SAC_1/final.gif", frames, fps=30)
     env.close()
+
+def save_gif():
+    import imageio
+    model_names = sorted([f for f in os.listdir("./humanoid_log/Jump/Lay Down Position/MlpPolicy/SAC_1") if f.startswith("best_model") and f.endswith(".zip")])
+    for model_name in model_names:
+        suffix = model_name[10:-4]
+        if suffix == "":
+            final = "final"
+        else:
+            final = suffix[1:]
+        env = DummyVecEnv([lambda: make_env(render_mode="rgb_array") for _ in range(1)])
+        env = VecNormalize.load(f"./humanoid_log/Jump/Lay Down Position/MlpPolicy/SAC_1/vec_normalize{suffix}.pkl", env)
+        env.training = False
+        env.norm_reward = False
+        obs_init = np.load(f"./humanoid_log/Jump/Lay Down Position/MlpPolicy/SAC_1/obs_init{suffix}.npy")
+        obs = env.reset()
+        env.venv.unwrapped.envs[0].data.qpos[2:] = obs_init[:22]
+        env.venv.unwrapped.envs[0].data.qvel[:] = 0
+        obs = obs_init.reshape(1,-1)
+        mujoco.mj_forward(env.venv.unwrapped.envs[0].model, env.venv.unwrapped.envs[0].data)
+
+        # Load pretrained model
+        model = SAC.load(f"./humanoid_log/Jump/Lay Down Position/MlpPolicy/SAC_1/{model_name}", env=env)
+        
+        dt_per_step = env.get_attr('model')[0].opt.timestep * env.get_attr('frame_skip')[0]
+
+        t = 0
+        z_hist = []
+        frames = []
+        for i in range(1000):
+            action, _ = model.predict(obs)
+            obs, reward, done, info = env.step(action)
+            z_hist.append(env.unnormalize_obs(obs)[0,0])
+            if len(z_hist) > 4096:
+                z_hist = z_hist[1:]
+            t += 1
+            frames.append(env.render())
+            if done[0]:
+                print(f"time lasts: {dt_per_step * t}")
+                t = 0
+                obs = env.reset()
+        a = sum(z_hist)/len(z_hist)
+        print(f"average height: {a}")
+        imageio.mimsave(f"./humanoid_log/Jump/Lay Down Position/MlpPolicy/SAC_1/{final}.gif", frames, fps=30)
+        env.close()
 
 if __name__ == "__main__":
     # main()
-    eval()
+    # eval()
+    save_gif()
